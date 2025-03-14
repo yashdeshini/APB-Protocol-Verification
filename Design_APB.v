@@ -1,66 +1,73 @@
-// [MODIFIED]  Code your design here
-module AMBA_APB(P_clk,P_rst,P_addr,P_selx,P_enable,P_write,P_wdata,P_ready,P_slverr,P_rdata);
-  // [MODIFIED] input configration 
-  input P_clk;
-  input P_rst;
-  input [31:0]P_addr;
-  
-  input P_selx;
-  input P_enable;
-  input P_write;
-  input [31:0]P_wdata;
-  
-  // [MODIFIED] output configration
-  output reg P_ready;
-  output reg  P_slverr;
-  output reg [31:0]P_rdata;
-  // [MODIFIED] memory decleration
-  reg [31:0]mem[31:0];
-  // [MODIFIED] state declaration communication
-  parameter [1:0] idle=2'b00;
-  parameter [1:0] setup=2'b01;
-  parameter [1:0] access=2'b10;
-  
-  // [MODIFIED] state declaration of present and next 
-  reg [1:0] present_state,next_state;
-  
-  always @(posedge P_clk) begin
-    if(P_rst) present_state <= idle;
-    else
-      present_state <= next_state;
-  end
-  always @(*) begin
-  // [MODIFIED] next_state =present_state;
-  case (present_state)
-    idle:begin
-      if (P_selx   & !P_enable) 	
-				next_state = setup;
-      P_ready=0;
-    end
+// [MODIFIED] AMBA APB Protocol Design
+module AMBA_APB (
+    input P_clk,
+    input P_rst,
+    input [31:0] P_addr,
+    input P_selx,
+    input P_enable,
+    input P_write,
+    input [31:0] P_wdata,
+    
+    output reg P_ready,
+    output reg P_slverr,
+    output reg [31:0] P_rdata
+);
 
-    setup:begin if (!P_enable | !P_selx) 
-						next_state = idle; 
-              else begin
-						next_state =access;
-                       
-                if(P_write ==1) begin
-                  mem[P_addr]= P_wdata;
-                  P_ready=1;
-                  P_slverr=0;
-                   end
-                 else begin
-                   P_rdata=mem[P_addr];
-                   P_ready=1;
-                   P_slverr=0;
-                 end
-               end
-    end
-    access :begin
-      if (!P_enable | !P_selx) begin
-					    next_state = idle;
-                        P_ready =0;
-             end
-    end
-	endcase 
+// [MODIFIED] Memory Declaration
+reg [31:0] mem [31:0];
+
+// [MODIFIED] State Declaration
+parameter [1:0] IDLE = 2'b00;
+parameter [1:0] SETUP = 2'b01;
+parameter [1:0] ACCESS = 2'b10;
+
+// [MODIFIED] Present and Next State Registers
+reg [1:0] present_state, next_state;
+
+// [MODIFIED] State Transition Logic
+always @(posedge P_clk or posedge P_rst) begin
+    if (P_rst) 
+        present_state <= IDLE;
+    else 
+        present_state <= next_state;
 end
+
+// [MODIFIED] Next State Logic and Output Control
+always @(*) begin
+    // Default assignments
+    P_ready = 0;
+    P_slverr = 0;
+
+    case (present_state)
+        IDLE: begin
+            if (P_selx && !P_enable) 
+                next_state = SETUP;
+            else
+                next_state = IDLE;
+        end
+
+        SETUP: begin
+            if (!P_selx || !P_enable) 
+                next_state = IDLE; 
+            else 
+                next_state = ACCESS;
+        end
+
+        ACCESS: begin
+            if (!P_selx || !P_enable) 
+                next_state = IDLE;
+            else begin
+                P_ready = 1;
+                if (P_write) begin
+                    mem[P_addr] = P_wdata; // Write Operation
+                end else begin
+                    P_rdata = mem[P_addr]; // Read Operation
+                end
+            end
+        end
+
+        default: next_state = IDLE;
+    endcase 
+end
+
 endmodule
